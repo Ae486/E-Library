@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - 云端书舍</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container" style="max-width: 450px;">
+        <div class="header">
+            <h1>📚 云端书舍</h1>
+            <p>E-Librarian 无人值守图书馆</p>
+        </div>
+
+        <div id="alert" style="display: none;"></div>
+
+        <!-- 登录表单 -->
+        <div id="login-form">
+            <h2 style="margin-bottom: 20px; color: #333;">用户登录</h2>
+            <form onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label for="username">用户名</label>
+                    <input type="text" id="username" required placeholder="请输入用户名">
+                </div>
+                <div class="form-group">
+                    <label for="password">密码</label>
+                    <input type="password" id="password" required placeholder="请输入密码">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">登录</button>
+            </form>
+            <div style="margin-top: 20px; text-align: center;">
+                <a href="#" onclick="showRegisterForm()" style="color: #667eea; text-decoration: none;">没有账号？立即注册</a>
+                <span style="margin: 0 10px; color: #ccc;">|</span>
+                <a href="#" onclick="showResetForm()" style="color: #667eea; text-decoration: none;">忘记密码？</a>
+            </div>
+        </div>
+
+        <!-- 注册表单 -->
+        <div id="register-form" style="display: none;">
+            <h2 style="margin-bottom: 20px; color: #333;">用户注册</h2>
+            <form onsubmit="handleRegister(event)">
+                <div class="form-group">
+                    <label for="reg-username">用户名</label>
+                    <input type="text" id="reg-username" required placeholder="请输入用户名">
+                </div>
+                <div class="form-group">
+                    <label for="reg-password">密码</label>
+                    <input type="password" id="reg-password" required placeholder="请输入密码">
+                </div>
+                <div class="form-group">
+                    <label for="reg-email">邮箱（选填）</label>
+                    <input type="email" id="reg-email" placeholder="请输入邮箱">
+                </div>
+                <div class="form-group">
+                    <label for="reg-phone">手机号（选填）</label>
+                    <input type="tel" id="reg-phone" placeholder="请输入手机号">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">注册</button>
+            </form>
+            <div style="margin-top: 20px; text-align: center;">
+                <a href="#" onclick="showLoginForm()" style="color: #667eea; text-decoration: none;">已有账号？立即登录</a>
+            </div>
+        </div>
+
+        <!-- 重置密码表单 -->
+        <div id="reset-form" style="display: none;">
+            <h2 style="margin-bottom: 20px; color: #333;">重置密码</h2>
+            <form onsubmit="handleReset(event)">
+                <div class="form-group">
+                    <label for="reset-username">用户名</label>
+                    <input type="text" id="reset-username" required placeholder="请输入用户名">
+                </div>
+                <div class="form-group">
+                    <label for="reset-phone">手机号</label>
+                    <input type="tel" id="reset-phone" required placeholder="请输入注册时的手机号">
+                </div>
+                <div class="form-group">
+                    <label for="reset-password">新密码</label>
+                    <input type="password" id="reset-password" required placeholder="请输入新密码">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">重置密码</button>
+            </form>
+            <div style="margin-top: 20px; text-align: center;">
+                <a href="#" onclick="showLoginForm()" style="color: #667eea; text-decoration: none;">返回登录</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+
+        function showAlert(message, type) {
+            const alert = document.getElementById('alert');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alert.style.display = 'block';
+            setTimeout(() => {
+                alert.style.display = 'none';
+            }, 3000);
+        }
+
+        function showLoginForm() {
+            document.getElementById('login-form').style.display = 'block';
+            document.getElementById('register-form').style.display = 'none';
+            document.getElementById('reset-form').style.display = 'none';
+        }
+
+        function showRegisterForm() {
+            document.getElementById('login-form').style.display = 'none';
+            document.getElementById('register-form').style.display = 'block';
+            document.getElementById('reset-form').style.display = 'none';
+        }
+
+        function showResetForm() {
+            document.getElementById('login-form').style.display = 'none';
+            document.getElementById('register-form').style.display = 'none';
+            document.getElementById('reset-form').style.display = 'block';
+        }
+
+        async function handleLogin(event) {
+            event.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    showAlert('登录成功！正在跳转...', 'success');
+                    setTimeout(() => {
+                        window.location.href = 'index.html';
+                    }, 1000);
+                } else {
+                    showAlert(data.message, 'error');
+                }
+            } catch (error) {
+                showAlert('登录失败，请检查网络连接', 'error');
+                console.error('Login error:', error);
+            }
+        }
+
+        async function handleRegister(event) {
+            event.preventDefault();
+            const username = document.getElementById('reg-username').value;
+            const password = document.getElementById('reg-password').value;
+            const email = document.getElementById('reg-email').value;
+            const phone = document.getElementById('reg-phone').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, email, phone })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert('注册成功！请登录', 'success');
+                    setTimeout(() => {
+                        showLoginForm();
+                    }, 1500);
+                } else {
+                    showAlert(data.message, 'error');
+                }
+            } catch (error) {
+                showAlert('注册失败，请检查网络连接', 'error');
+                console.error('Register error:', error);
+            }
+        }
+
+        async function handleReset(event) {
+            event.preventDefault();
+            const username = document.getElementById('reset-username').value;
+            const phone = document.getElementById('reset-phone').value;
+            const new_password = document.getElementById('reset-password').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/reset-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, phone, new_password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert('密码重置成功！请登录', 'success');
+                    setTimeout(() => {
+                        showLoginForm();
+                    }, 1500);
+                } else {
+                    showAlert(data.message, 'error');
+                }
+            } catch (error) {
+                showAlert('重置失败，请检查网络连接', 'error');
+                console.error('Reset error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

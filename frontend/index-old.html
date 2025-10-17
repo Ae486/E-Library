@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>云端书舍 - 主页</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 导航栏 -->
+        <div class="navbar">
+            <div class="logo">📚 云端书舍</div>
+            <div class="nav-links">
+                <a href="index.html">图书检索</a>
+                <a href="#" onclick="showMyBorrowings()">我的借阅</a>
+                <a href="#" onclick="showAdminPanel()" id="admin-link" style="display: none;">管理面板</a>
+                <a href="#" onclick="logout()">退出登录</a>
+            </div>
+            <div class="user-info">
+                欢迎，<span id="username"></span>
+            </div>
+        </div>
+
+        <div id="alert" style="display: none;"></div>
+
+        <!-- 图书检索区域 -->
+        <div id="book-search-area">
+            <h2 style="margin-bottom: 20px; color: #333;">图书检索</h2>
+
+            <div class="search-box">
+                <input type="text" id="search-input" placeholder="搜索书名、作者或ISBN...">
+                <button class="btn btn-primary" onclick="searchBooks()">搜索</button>
+                <button class="btn btn-secondary" onclick="loadAllBooks()">显示全部</button>
+            </div>
+
+            <div id="books-container" class="grid"></div>
+        </div>
+
+        <!-- 我的借阅记录区域 -->
+        <div id="my-borrowings-area" style="display: none;">
+            <h2 style="margin-bottom: 20px; color: #333;">我的借阅记录</h2>
+            <button class="btn btn-secondary" onclick="showBookSearch()" style="margin-bottom: 20px;">返回图书检索</button>
+            <div id="borrowings-container"></div>
+        </div>
+
+        <!-- 管理员面板 -->
+        <div id="admin-area" style="display: none;">
+            <h2 style="margin-bottom: 20px; color: #333;">管理员面板</h2>
+            <button class="btn btn-secondary" onclick="showBookSearch()" style="margin-bottom: 20px;">返回主页</button>
+
+            <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); margin-bottom: 30px;">
+                <div class="stat-card">
+                    <h3 id="total-users">0</h3>
+                    <p>总用户数</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="total-books">0</h3>
+                    <p>总图书数</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="total-borrowings">0</h3>
+                    <p>借阅次数</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="current-borrowings">0</h3>
+                    <p>当前借阅</p>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 30px;">
+                <h3 style="color: #333; margin-bottom: 15px;">添加新图书</h3>
+                <form onsubmit="addBook(event)" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="form-group">
+                        <label>书名</label>
+                        <input type="text" id="book-title" required>
+                    </div>
+                    <div class="form-group">
+                        <label>作者</label>
+                        <input type="text" id="book-author" required>
+                    </div>
+                    <div class="form-group">
+                        <label>ISBN</label>
+                        <input type="text" id="book-isbn">
+                    </div>
+                    <div class="form-group">
+                        <label>分类</label>
+                        <input type="text" id="book-category">
+                    </div>
+                    <div class="form-group">
+                        <label>出版社</label>
+                        <input type="text" id="book-publisher">
+                    </div>
+                    <div class="form-group">
+                        <label>数量</label>
+                        <input type="number" id="book-quantity" value="1" min="1">
+                    </div>
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label>简介</label>
+                        <textarea id="book-description" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-success" style="grid-column: 1 / -1;">添加图书</button>
+                </form>
+            </div>
+
+            <div>
+                <h3 style="color: #333; margin-bottom: 15px;">所有图书列表</h3>
+                <div id="admin-books-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+        let currentUser = null;
+
+        // 页面加载时检查登录状态
+        window.onload = function() {
+            const userStr = localStorage.getItem('user');
+            if (!userStr) {
+                window.location.href = 'login.html';
+                return;
+            }
+            currentUser = JSON.parse(userStr);
+            document.getElementById('username').textContent = currentUser.username;
+
+            if (currentUser.role === 'admin') {
+                document.getElementById('admin-link').style.display = 'block';
+            }
+
+            loadAllBooks();
+        };
+
+        function showAlert(message, type) {
+            const alert = document.getElementById('alert');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alert.style.display = 'block';
+            setTimeout(() => {
+                alert.style.display = 'none';
+            }, 3000);
+        }
+
+        function logout() {
+            localStorage.removeItem('user');
+            window.location.href = 'login.html';
+        }
+
+        function showBookSearch() {
+            document.getElementById('book-search-area').style.display = 'block';
+            document.getElementById('my-borrowings-area').style.display = 'none';
+            document.getElementById('admin-area').style.display = 'none';
+        }
+
+        function showMyBorrowings() {
+            document.getElementById('book-search-area').style.display = 'none';
+            document.getElementById('my-borrowings-area').style.display = 'block';
+            document.getElementById('admin-area').style.display = 'none';
+            loadMyBorrowings();
+        }
+
+        function showAdminPanel() {
+            if (currentUser.role !== 'admin') {
+                showAlert('权限不足', 'error');
+                return;
+            }
+            document.getElementById('book-search-area').style.display = 'none';
+            document.getElementById('my-borrowings-area').style.display = 'none';
+            document.getElementById('admin-area').style.display = 'block';
+            loadAdminData();
+        }
+
+        async function loadAllBooks() {
+            try {
+                const response = await fetch(`${API_BASE}/books/list`);
+                const data = await response.json();
+
+                if (data.success) {
+                    displayBooks(data.books);
+                }
+            } catch (error) {
+                showAlert('加载图书失败', 'error');
+                console.error('Error:', error);
+            }
+        }
+
+        async function searchBooks() {
+            const query = document.getElementById('search-input').value;
+            try {
+                const response = await fetch(`${API_BASE}/books/search?query=${encodeURIComponent(query)}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    displayBooks(data.books);
+                }
+            } catch (error) {
+                showAlert('搜索失败', 'error');
+                console.error('Error:', error);
+            }
+        }
+
+        function displayBooks(books) {
+            const container = document.getElementById('books-container');
+            if (books.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #666;">未找到相关图书</p>';
+                return;
+            }
+
+            container.innerHTML = books.map(book => `
+                <div class="card">
+                    <div class="card-title">${book.title}</div>
+                    <div class="card-content">
+                        <p><strong>作者:</strong> ${book.author || '未知'}</p>
+                        <p><strong>分类:</strong> ${book.category || '未分类'}</p>
+                        <p><strong>出版社:</strong> ${book.publisher || '未知'}</p>
+                        <p><strong>ISBN:</strong> ${book.isbn || '无'}</p>
+                        <p><strong>库存:</strong> ${book.available_quantity} / ${book.total_quantity}</p>
+                        <p style="margin-top: 10px; color: #666;">${book.description || '暂无简介'}</p>
+                        <button class="btn btn-primary" style="margin-top: 15px; width: 100%;"
+                                onclick="borrowBook(${book.id})"
+                                ${book.available_quantity <= 0 ? 'disabled' : ''}>
+                            ${book.available_quantity > 0 ? '借阅' : '库存不足'}
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function borrowBook(bookId) {
+            if (!confirm('确认借阅此图书？')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/books/borrow`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: currentUser.id, book_id: bookId })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert('借阅成功！', 'success');
+                    loadAllBooks();
+                } else {
+                    showAlert(data.message, 'error');
+                }
+            } catch (error) {
+                showAlert('借阅失败', 'error');
+                console.error('Error:', error);
+            }
+        }
+
+        async function loadMyBorrowings() {
+            try {
+                const response = await fetch(`${API_BASE}/books/my-borrowings/${currentUser.id}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    displayBorrowings(data.records);
+                }
+            } catch (error) {
+                showAlert('加载借阅记录失败', 'error');
+                console.error('Error:', error);
+            }
+        }
+
+        function displayBorrowings(records) {
+            const container = document.getElementById('borrowings-container');
+            if (records.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #666;">暂无借阅记录</p>';
+                return;
+            }
+
+            container.innerHTML = `
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>书名</th>
+                            <th>作者</th>
+                            <th>借阅日期</th>
+                            <th>到期日期</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${records.map(record => `
+                            <tr>
+                                <td>${record.title}</td>
+                                <td>${record.author}</td>
+                                <td>${new Date(record.borrow_date).toLocaleDateString()}</td>
+                                <td>${new Date(record.due_date).toLocaleDateString()}</td>
+                                <td>
+                                    <span class="badge badge-${record.status === 'borrowed' ? 'warning' : 'success'}">
+                                        ${record.status === 'borrowed' ? '借阅中' : '已归还'}
+                                    </span>
+                                </td>
+                                <td>
+                                    ${record.status === 'borrowed' ? `
+                                        <button class="btn btn-success" style="padding: 6px 12px; margin-right: 5px;"
+                                                onclick="returnBook(${record.id})">归还</button>
+                                        <button class="btn btn-secondary" style="padding: 6px 12px;"
+                                                onclick="renewBook(${record.id})">续借</button>
+                                    ` : '-'}
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        async function returnBook(recordId) {
+            if (!confirm('确认归还此图书？')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/books/return`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ record_id: recordId })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert('归还成功！', 'success');
+                    loadMyBorrowings();
+                } else {
+                    showAlert(data.message, 'error');
+                }
+            } catch (error) {
+                showAlert('归还失败', 'error');
+                console.error('Error:', error);
+            }
+        }
+
+        async function renewBook(recordId) {
+            if (!confirm('确认续借此图书？')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/books/renew`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ record_id: recordId })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert('续借成功！', 'success');
+                    loadMyBorrowings();
+                } else {
+                    showAlert(data.message, 'error');
+                }
+            } catch (error) {
+                showAlert('续借失败', 'error');
+                console.error('Error:', error);
+            }
+        }
+
+        async function loadAdminData() {
+            try {
+                // 加载统计数据
+                const statsResponse = await fetch(`${API_BASE}/admin/borrowings/statistics`);
+                const statsData = await statsResponse.json();
+
+                if (statsData.success) {
+                    document.getElementById('total-borrowings').textContent = statsData.total_borrowings;
+                    document.getElementById('current-borrowings').textContent = statsData.current_borrowings;
+                }
+
+                const userStatsResponse = await fetch(`${API_BASE}/admin/users/statistics`);
+                const userStatsData = await userStatsResponse.json();
+
+                if (userStatsData.success) {
+                    document.getElementById('total-users').textContent = userStatsData.total_users;
+                }
+
+                // 加载图书列表
+                const booksResponse = await fetch(`${API_BASE}/books/list`);
+                const booksData = await booksResponse.json();
+
+                if (booksData.success) {
+                    document.getElementById('total-books').textContent = booksData.books.length;
+                    displayAdminBooks(booksData.books);
+                }
+            } catch (error) {
+                showAlert('加载管理数据失败', 'error');
+                console.error('Error:', error);
+            }
+        }
+
+        function displayAdminBooks(books) {
+            const container = document.getElementById('admin-books-container');
+            container.innerHTML = `
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>书名</th>
+                            <th>作者</th>
+                            <th>分类</th>
+                            <th>库存</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${books.map(book => `
+                            <tr>
+                                <td>${book.title}</td>
+                                <td>${book.author}</td>
+                                <td>${book.category || '-'}</td>
+                                <td>${book.available_quantity} / ${book.total_quantity}</td>
+                                <td>
+                                    <button class="btn btn-danger" style="padding: 6px 12px;"
+                                            onclick="deleteBook(${book.id})">删除</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        async function addBook(event) {
+            event.preventDefault();
+
+            const bookData = {
+                title: document.getElementById('book-title').value,
+                author: document.getElementById('book-author').value,
+                isbn: document.getElementById('book-isbn').value,
+                category: document.getElementById('book-category').value,
+                publisher: document.getElementById('book-publisher').value,
+                total_quantity: parseInt(document.getElementById('book-quantity').value),
+                description: document.getElementById('book-description').value
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/admin/books/add`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bookData)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert('添加成功！', 'success');
+                    event.target.reset();
+                    loadAdminData();
+                } else {
+                    showAlert(data.message, 'error');
+                }
+            } catch (error) {
+                showAlert('添加失败', 'error');
+                console.error('Error:', error);
+            }
+        }
+
+        async function deleteBook(bookId) {
+            if (!confirm('确认删除此图书？此操作不可恢复！')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/admin/books/delete/${bookId}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert('删除成功！', 'success');
+                    loadAdminData();
+                } else {
+                    showAlert(data.message, 'error');
+                }
+            } catch (error) {
+                showAlert('删除失败', 'error');
+                console.error('Error:', error);
+            }
+        }
+    </script>
+</body>
+</html>
