@@ -1,5 +1,5 @@
 ```bash
-# 1. 克隆你的仓库
+# 1. 克隆仓库
 git clone https://github.com/Ae486/E-Librarian.git
 cd E-Librarian
 
